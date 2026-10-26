@@ -12,6 +12,14 @@ Interface IDs use the hovered component supplied by the client's menu. UI
 backgrounds without menu entries may not expose an ID. NPC IDs are config IDs,
 not the unique ID of an individual NPC instance.
 
+Open Context IDs from the ribbon icon in the Plugins window to use the Item
+spawner. Search by common name or ID, select a result, enter a quantity, and click
+**Spawn**. The command uses the selected item's current config name. Spawning
+uses the developer server's `!give` command.
+
+Name search uses a bundled item catalog. Numeric ID lookup reads the current
+client directly, including items missing from the catalog.
+
 Clone this repository into `dev_plugins/ContextIDs`, or extract the release ZIP
 there. Run `prf` and `pon ContextIDs` in the developer console. To reload, run
 `prf` and `prl ContextIDs`.

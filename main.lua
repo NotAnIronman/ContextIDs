@@ -4,6 +4,14 @@ local hover = require("lib/native_hover").new()
 local cursor = require("lib/cursor_overlay").new()
 local function clearDisplay() hover:clear(); cursor:hide() end
 local settings = require("lib/settings").new(PersistentDB, clearDisplay)
+local spawner = require("lib/item_spawner").new({
+    items=function() return require("lib/item_data") end,
+    lookup=function(itemID) return config.Obj.FromID(itemID) end,
+    execute=function(command) ExecuteConsoleCommand(command) end,
+})
+local spawnerView = require("lib/spawner_view").new(spawner,function()
+    return type(ExecuteConsoleCommand) == "function"
+end)
 local focused, selected = true, nil
 local reference = "context-ids"
 local subscriptions = {}
@@ -44,6 +52,7 @@ subscribe("MiniMenuReady", function(event)
 end)
 
 subscribe("Draw", function()
+    spawnerView:draw()
     if not selected or not allowed() or MiniMenu.IsOpen() then clearDisplay(); return end
     if selected.kind == "Interface" then
         hover:clear()
@@ -64,11 +73,18 @@ subscribe("GameStateChanged", function()
     selected = nil
     hover:clear()
     cursor:clear()
+    spawnerView:clear()
 end)
 subscribe("SettingsLayerReady", function(event) settings:build(event.component) end)
+subscribe("ContentLayerReady", function(event)
+    selected = nil
+    clearDisplay()
+    spawnerView:build(event.component)
+end)
 
 function PluginShutdown()
     for _, name in ipairs(subscriptions) do Event[name].Unsubscribe(reference) end
     hover:clear()
     cursor:clear()
+    spawnerView:clear()
 end

@@ -10,12 +10,17 @@ end
 
 local handlers, widgets, logs, saved, control, focused, menuOpen, mouse, mouseAvailable
 local host, settingsHost, nativeLabel, nativeBox, nativeLayers, apiAvailable
+local objects, commands, contentHost
 local function boot(preferences)
     handlers, widgets, logs, saved = {}, {}, {}, preferences or {}
     control, focused, menuOpen, mouseAvailable, apiAvailable = false, true, false, true, true
     mouse = {x=200, y=200}
+    objects, commands = {
+        [42005]={id=42005,name="Reward casket (master)",configName="MASTER_CASKET_FIXTURE"},
+        [383]={id=383,name="Raw shark",configName="RAW_SHARK"},
+    }, {}
     Event = {}
-    for _, name in ipairs({"MiniMenuReady", "Draw", "MiniMenuOpened", "WindowFocusChanged", "GameStateChanged", "SettingsLayerReady"}) do
+    for _, name in ipairs({"MiniMenuReady", "Draw", "MiniMenuOpened", "WindowFocusChanged", "GameStateChanged", "SettingsLayerReady", "ContentLayerReady"}) do
         Event[name] = {Subscribe=function(_, callback) handlers[name]=callback end,
             Unsubscribe=function() handlers[name]=nil end}
     end
@@ -23,12 +28,14 @@ local function boot(preferences)
     PersistentDB = {GetBool=function(_, key) return saved[key] end,
         SetBool=function(_, key, value) saved[key]=value; return true end}
     id = {Interface={TOPLEVEL_V2=1477}, Component={TOPLEVEL_V2__PLUGIN_BUILD_LAYER_TOP=3},
-        Font={MUSEO_SANS_15PT_REGULAR=1}, StyleSheet={BUTTON_DEFAULT=2}}
+        Font={MUSEO_SANS_15PT_REGULAR=1}, StyleSheet={BUTTON_DEFAULT=2,INPUT_DEFAULT=3}}
     config = {Font={FromID=function() return {GetStringWidth=function(_, content)
         return #content:gsub("<[^>]*>", "") * 7
     end} end}}
+    config.Obj = {FromID=function(itemID) return objects[itemID] end}
+    ExecuteConsoleCommand=function(command) commands[#commands+1]=command end
     local function component(kind, parent)
-        local value = {kind=kind, parent=parent, children={}, hooks={}, text={}, hidden=false}
+        local value = {kind=kind, parent=parent, children={}, hooks={}, text={}, hidden=false,visibleGlobal=true}
         function value:SetSize(w,h,wp,hp)
             self.size = {width=w, height=h, widthParentPc=wp or 0, heightParentPc=hp or 0}
             self.width = w+(wp or 0)*(self.parent and self.parent.width or 0)
@@ -43,6 +50,13 @@ local function boot(preferences)
         function value:SetPos(x,y) self.x,self.y=x,y end
         function value:MoveToFront() self.front=true end
         function value:Subscribe(hook, callback) self.hooks[hook]=callback end
+        function value:Setup(visibility,filter,maxLength)
+            self.visibility,self.filterMode,self.maxLength=visibility,filter,maxLength
+        end
+        function value:DeleteAll()
+            for _,child in ipairs(self.children) do child:Destroy() end
+            self.children={}
+        end
         function value:Destroy()
             self.destroyed,self.hidden=true,true
             for _, child in ipairs(self.children) do child:Destroy() end
@@ -59,6 +73,8 @@ local function boot(preferences)
     host.xyGlobal={x=0,y=0}
     settingsHost=component("SettingsHost")
     settingsHost:SetSize(420,300)
+    contentHost=component("ContentHost")
+    contentHost:SetSize(420,500)
     nativeBox=component("NativeFrame",viewport)
     nativeBox:SetSize(135,54)
     nativeBox.staticID,nativeBox.type=899,20
@@ -74,7 +90,9 @@ local function boot(preferences)
     nativeLabel:SetSize(0,18,1,0)
     nativeLabel.type,nativeLabel.font,nativeLabel.visibleGlobal=2,1,true
     nativeLabel.content=""
-    ui={Hook={ONBUTTONPRESSED=1}, ComponentType={LABEL=2,LAYER=20}, Interfaces={}}
+    ui={Hook={ONBUTTONPRESSED=1,ONCONTENTCHANGED=2}, ComponentType={LABEL=2,LAYER=20}, Interfaces={},
+        TextContentVisibilityMode={VISIBLE=0},InputFieldFilterMode={NONE=0,NUMERIC=2},
+        InputFieldActionResult={CONTENT_CHANGE=1,SUBMIT=2,SUBMIT_ON_ESCAPE=3,SUBMIT_ON_FOCUS_LOSS=4}}
     function ui.Interfaces:GetComponent(interfaceID,staticID,categoryID,dynamicID)
         if not apiAvailable then return nil end
         if interfaceID==3 then return host end
@@ -85,7 +103,7 @@ local function boot(preferences)
         end
         return nativeLayers[staticID]
     end
-    for _, kind in ipairs({"Layer","Text","Rectangle","Button"}) do
+    for _, kind in ipairs({"Layer","Text","Rectangle","Button","InputField"}) do
         ui[kind]={new=function(parent) return component(kind,parent) end}
     end
     Mouse={IsAvailable=function() return mouseAvailable end, GetPosition=function() return mouse end}
@@ -395,6 +413,146 @@ test("hidden and mismatched native labels are not annotated",function()
     nativeLabel.visibleGlobal=false
     handlers.Draw({})
     equal(nativeLabel.content,"Raw shark")
+end)
+
+local function findControl(kind, predicate)
+    for index=#widgets,1,-1 do
+        local widget=widgets[index]
+        if widget.kind==kind and not widget.destroyed and (not predicate or predicate(widget)) then return widget end
+    end
+    error("Control not found: "..kind)
+end
+local function typeField(field,content,reason)
+    field.content=content
+    field.hooks[ui.Hook.ONCONTENTCHANGED](field,reason or ui.InputFieldActionResult.CONTENT_CHANGE,content)
+end
+local function searchField()
+    return findControl("InputField",function(field) return field.emptyText=="Search item name or ID" end)
+end
+local function quantityField()
+    return findControl("InputField",function(field) return field.filterMode==ui.InputFieldFilterMode.NUMERIC end)
+end
+local function spawnButton()
+    return findControl("Button",function(button) return button.label=="Spawn" end)
+end
+local function chooseMaster()
+    local row=findControl("Button",function(button) return button.label:find("[42005]",1,true)~=nil end)
+    row.hooks[ui.Hook.ONBUTTONPRESSED]()
+end
+
+test("spawner UI searches the actual catalog and sends a command only after clicking Spawn",function()
+    boot()
+    handlers.ContentLayerReady({component=contentHost})
+    typeField(searchField(),"Reward Casket (Master)")
+    for _=1,100 do handlers.Draw({}) end
+    equal(#commands,0)
+    chooseMaster()
+    typeField(quantityField(),"12")
+    local preview=findControl("InputField",function(field) return field.emptyText=="Command preview" end)
+    equal(preview.content,"!give MASTER_CASKET_FIXTURE 12")
+    equal(spawnButton().enabled,true)
+    equal(#commands,0)
+    spawnButton().hooks[ui.Hook.ONBUTTONPRESSED]()
+    equal(#commands,1)
+    equal(commands[1],"!give MASTER_CASKET_FIXTURE 12")
+end)
+
+test("search Enter, quantity Enter, and focus loss never spawn an item",function()
+    boot()
+    handlers.ContentLayerReady({component=contentHost})
+    typeField(searchField(),"42005",ui.InputFieldActionResult.SUBMIT)
+    typeField(quantityField(),"4",ui.InputFieldActionResult.SUBMIT)
+    typeField(quantityField(),"4",ui.InputFieldActionResult.SUBMIT_ON_FOCUS_LOSS)
+    equal(spawnButton().enabled,true)
+    equal(#commands,0)
+end)
+
+test("spawner UI disables Spawn for invalid quantities and unavailable config names",function()
+    boot()
+    handlers.ContentLayerReady({component=contentHost})
+    typeField(searchField(),"42005")
+    typeField(quantityField(),"0")
+    equal(spawnButton().enabled,false)
+    typeField(quantityField(),"2147483648")
+    equal(spawnButton().enabled,false)
+    typeField(quantityField(),"1")
+    equal(spawnButton().enabled,true)
+    objects[42005].configName=""
+    typeField(searchField(),"42005")
+    equal(spawnButton().enabled,false)
+    equal(#commands,0)
+end)
+
+test("editing the preview cannot send an arbitrary console command",function()
+    boot()
+    handlers.ContentLayerReady({component=contentHost})
+    typeField(searchField(),"42005")
+    local preview=findControl("InputField",function(field) return field.emptyText=="Command preview" end)
+    preview.content="!resetsave"
+    spawnButton().hooks[ui.Hook.ONBUTTONPRESSED]()
+    equal(commands[1],"!give MASTER_CASKET_FIXTURE 1")
+end)
+
+test("new search clears the old spawn target before results arrive",function()
+    boot()
+    handlers.ContentLayerReady({component=contentHost})
+    typeField(searchField(),"42005")
+    equal(spawnButton().enabled,true)
+    typeField(searchField(),"Raw shark")
+    equal(spawnButton().enabled,false)
+    for _=1,100 do handlers.Draw({}) end
+    local row=findControl("Button",function(button) return button.label:find("[383]",1,true)~=nil end)
+    row.hooks[ui.Hook.ONBUTTONPRESSED]()
+    spawnButton().hooks[ui.Hook.ONBUTTONPRESSED]()
+    equal(commands[1],"!give RAW_SHARK 1")
+end)
+
+test("spawner panel resizing preserves the search and quantity",function()
+    boot()
+    handlers.ContentLayerReady({component=contentHost})
+    typeField(searchField(),"42005")
+    typeField(quantityField(),"7")
+    contentHost:SetSize(420,300)
+    handlers.Draw({})
+    equal(searchField().content,"42005")
+    equal(quantityField().content,"7")
+    equal(spawnButton().enabled,true)
+    local status=findControl("Text",function(text) return text.content:find("Ready.",1,true)~=nil end)
+    assert(status.y+status.height<=300)
+    spawnButton().hooks[ui.Hook.ONBUTTONPRESSED]()
+    equal(commands[1],"!give MASTER_CASKET_FIXTURE 7")
+end)
+
+test("pagination changes the visible result rows without sending commands",function()
+    boot()
+    handlers.ContentLayerReady({component=contentHost})
+    typeField(searchField(),"rune")
+    for _=1,100 do handlers.Draw({}) end
+    local nextButton=findControl("Button",function(button) return button.label=="Next" end)
+    equal(nextButton.enabled,true)
+    nextButton.hooks[ui.Hook.ONBUTTONPRESSED]()
+    local page=findControl("Text",function(text) return text.content:find("Page 2 /",1,true)~=nil end)
+    assert(page.content)
+    equal(#commands,0)
+end)
+
+test("spawner handles missing console access and is destroyed on game-state change",function()
+    boot()
+    ExecuteConsoleCommand=nil
+    handlers.ContentLayerReady({component=contentHost})
+    local root=contentHost.children[#contentHost.children]
+    typeField(searchField(),"42005")
+    equal(spawnButton().enabled,false)
+    handlers.GameStateChanged({})
+    equal(root.destroyed,true)
+    equal(#commands,0)
+end)
+
+test("world hover IDs remain available outside the spawner panel",function()
+    boot()
+    handlers.ContentLayerReady({component=contentHost})
+    select({item("Raw shark",383)})
+    equal(annotated(),true)
 end)
 
 test("shutdown removes subscriptions and destroys only the plugin overlay",function()
