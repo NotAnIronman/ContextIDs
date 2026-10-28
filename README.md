@@ -4,6 +4,12 @@ Shows item, NPC, and world-object IDs in the game's hover text and right-click
 menu. Interface IDs appear beside the cursor. Inventory and bank items show
 their item ID.
 
+Hovering a sprite component or button also shows its built-in sprite ID beside
+the interface ID and in the right-click menu. Use that ID in Sprite Viewer.
+Generated item images and runtime sprites do not expose a reusable built-in
+sprite ID. Only the component supplied by the client's menu is inspected, so
+decorative images without menu entries may not expose an ID.
+
 Enable **Hold Control to show** in the plugin's gear settings to display IDs
 only while Control is held. This setting is off by default and saved on reload.
 An open right-click menu keeps the IDs it had when opened.

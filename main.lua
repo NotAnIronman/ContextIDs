@@ -38,7 +38,7 @@ subscribe("MiniMenuReady", function(event)
         originals[entry] = nil
         if show then
             local target = Target.resolve(entry)
-            if target and target.kind ~= "Interface" then
+            if target and (target.kind ~= "Interface" or target.spriteID ~= nil) then
                 local original = entry.overrideText or ""
                 local base = original ~= "" and original or entry.fullText
                 local rendered = base .. Text.annotation(target)
@@ -56,7 +56,7 @@ subscribe("Draw", function()
     if not selected or not allowed() or MiniMenu.IsOpen() then clearDisplay(); return end
     if selected.kind == "Interface" then
         hover:clear()
-        cursor:show("Interface ID: " .. selected.id)
+        cursor:show(Text.label(selected))
     else
         cursor:hide()
         hover:setTarget(selected.name, Text.annotation(selected))

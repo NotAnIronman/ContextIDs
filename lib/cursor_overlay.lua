@@ -58,7 +58,7 @@ function M.new()
         if not ok then
             self:clear()
             if tostring(err) ~= lastError then
-                log("Context IDs could not draw the interface ID: " .. tostring(err))
+                log("Context IDs could not draw the interface IDs: " .. tostring(err))
                 lastError = tostring(err)
             end
         else

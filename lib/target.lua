@@ -5,6 +5,20 @@ local function validID(value)
     return type(value) == "number" and value >= 0 and value <= 2147483647 and value % 1 == 0
 end
 
+local function spriteID(component)
+    local ok, value = pcall(function()
+        local sprite
+        if component.type == ui.ComponentType.SPRITE then
+            if validID(component.associatedObjectID) then return nil end
+            sprite = component
+        elseif component.type == ui.ComponentType.BUTTON then
+            sprite = component.sprite
+        end
+        if sprite and sprite.runtimeSprite == nil then return sprite.spriteID end
+    end)
+    if ok and validID(value) then return value end
+end
+
 local function resolve(entry)
     if not entry then return nil end
     local kind, value, fallback
@@ -15,7 +29,9 @@ local function resolve(entry)
             kind, value, fallback = "Item", data.objConfig.id, data.objConfig.name
         elseif data.component then
             local interfaceID = data.component.interfaceID
-            if validID(interfaceID) then return {kind="Interface", id=interfaceID} end
+            if validID(interfaceID) then
+                return {kind="Interface", id=interfaceID, spriteID=spriteID(data.component)}
+            end
         end
     elseif entry.actionEntryType == MiniMenuEntryType.OBJ then
         local cfg = entry.objData and entry.objData.config

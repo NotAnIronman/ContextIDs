@@ -90,7 +90,7 @@ local function boot(preferences)
     nativeLabel:SetSize(0,18,1,0)
     nativeLabel.type,nativeLabel.font,nativeLabel.visibleGlobal=2,1,true
     nativeLabel.content=""
-    ui={Hook={ONBUTTONPRESSED=1,ONCONTENTCHANGED=2}, ComponentType={LABEL=2,LAYER=20}, Interfaces={},
+    ui={Hook={ONBUTTONPRESSED=1,ONCONTENTCHANGED=2}, ComponentType={LABEL=2,SPRITE=3,BUTTON=9,LAYER=20}, Interfaces={},
         TextContentVisibilityMode={VISIBLE=0},InputFieldFilterMode={NONE=0,NUMERIC=2},
         InputFieldActionResult={CONTENT_CHANGE=1,SUBMIT=2,SUBMIT_ON_ESCAPE=3,SUBMIT_ON_FOCUS_LOSS=4}}
     function ui.Interfaces:GetComponent(interfaceID,staticID,categoryID,dynamicID)
@@ -184,6 +184,90 @@ test("inventory and bank item IDs take priority over their containing interface"
     local target=Target.resolve(interface(1477))
     equal(target.kind,"Interface")
     equal(target.id,1477)
+end)
+
+test("sprite components show built-in IDs beside their interface and in the menu",function()
+    boot()
+    local entry=interface(1477)
+    entry.componentData.component.type=ui.ComponentType.SPRITE
+    entry.componentData.component.spriteID=1234
+    entry.componentData.component.associatedObjectID=-1
+    select({entry})
+    equal(floatingText(),"Interface ID: 1477 | Sprite ID: 1234")
+    equal(entry.overrideText,"Open Settings <col=80d8ff>(Interface ID: 1477 | Sprite ID: 1234)</col>")
+    equal(nativeBox.width,135)
+end)
+
+test("button graphics expose their sprite ID including zero",function()
+    boot()
+    local entry=interface(1639)
+    entry.componentData.component.type=ui.ComponentType.BUTTON
+    entry.componentData.component.sprite={spriteID=0}
+    select({entry})
+    equal(floatingText(),"Interface ID: 1639 | Sprite ID: 0")
+    assert(entry.overrideText:find("Sprite ID: 0",1,true))
+end)
+
+test("runtime sprites and associated item images retain their existing IDs",function()
+    boot()
+    local entry=interface(1477)
+    entry.componentData.component.type=ui.ComponentType.SPRITE
+    entry.componentData.component.spriteID=1234
+    entry.componentData.component.runtimeSprite={}
+    select({entry})
+    equal(floatingText(),"Interface ID: 1477")
+    equal(entry.overrideText,nil)
+    entry.componentData.component.runtimeSprite=nil
+    entry.componentData.component.associatedObjectID=383
+    select({entry})
+    equal(floatingText(),"Interface ID: 1477")
+    entry.componentData.objConfig={id=383,name="Raw shark"}
+    entry.subjectText,entry.fullText="Raw shark","Eat Raw shark"
+    select({entry})
+    equal(floatingText(),nil)
+    equal(entry.overrideText,"Eat Raw shark <col=80d8ff>(Item ID: 383)</col>")
+end)
+
+test("invalid or unreadable sprite properties preserve the interface ID",function()
+    boot()
+    local entry=interface(1477)
+    entry.componentData.component.type=ui.ComponentType.SPRITE
+    for _, value in ipairs({-1,1.5,math.huge,"1234"}) do
+        entry.componentData.component.spriteID=value
+        select({entry})
+        equal(floatingText(),"Interface ID: 1477")
+    end
+    entry.componentData.component.spriteID=nil
+    setmetatable(entry.componentData.component,{__index=function(_,key)
+        if key=="spriteID" then error("sprite not available") end
+    end})
+    select({entry})
+    equal(floatingText(),"Interface ID: 1477")
+end)
+
+test("sprite IDs follow Control and refresh without duplicate or stale annotations",function()
+    boot({holdControl=true})
+    local entry=interface(1477)
+    entry.componentData.component.type=ui.ComponentType.SPRITE
+    entry.componentData.component.spriteID=1234
+    select({entry})
+    equal(floatingText(),nil)
+    equal(entry.overrideText,nil)
+    control=true
+    select({entry})
+    select({entry})
+    equal(entry.overrideText,"Open Settings <col=80d8ff>(Interface ID: 1477 | Sprite ID: 1234)</col>")
+    entry.componentData.component.spriteID=4321
+    select({entry})
+    equal(floatingText(),"Interface ID: 1477 | Sprite ID: 4321")
+    equal(entry.overrideText,"Open Settings <col=80d8ff>(Interface ID: 1477 | Sprite ID: 4321)</col>")
+    entry.componentData.component.spriteID=-1
+    select({entry})
+    equal(floatingText(),"Interface ID: 1477")
+    equal(entry.overrideText,"")
+    control=false
+    handlers.Draw({})
+    equal(floatingText(),nil)
 end)
 
 test("unreadable, invalid, and unrelated targets remain unlabelled",function()
