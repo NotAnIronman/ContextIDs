@@ -1,7 +1,7 @@
 local M = {}
 
 local function plain(value)
-    return value:gsub("<[^>]*>", ""):gsub("[\r\n]", " ")
+    return value:gsub("<[^>]*>", "", math.maxinteger):gsub("[\r\n]", " ", math.maxinteger)
 end
 
 function M.new(model, canExecute)

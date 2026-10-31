@@ -2,7 +2,7 @@ local M = {}
 
 function M.normalise(value)
     if type(value) ~= "string" then return "" end
-    return value:gsub("<[^>]*>", ""):lower():gsub("%s+", " "):match("^%s*(.-)%s*$")
+    return value:gsub("<[^>]*>", "", math.maxinteger):lower():gsub("%s+", " ", math.maxinteger):match("^%s*(.-)%s*$", 1)
 end
 
 function M.label(target)

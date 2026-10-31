@@ -77,8 +77,8 @@ function M.new()
             local original = applied and current == applied.rendered and applied.original or current
             local plain = Text.normalise(original)
             local first, last = plain:find(name, 1, true)
-            if not first or (first > 1 and plain:sub(first - 1, first - 1):match("[%w]"))
-                or plain:sub(last + 1, last + 1):match("[%w]") then
+            if not first or (first > 1 and plain:sub(first - 1, first - 1):match("[%w]", 1))
+                or plain:sub(last + 1, last + 1):match("[%w]", 1) then
                 restore(); return
             end
 

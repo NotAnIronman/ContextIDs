@@ -2,8 +2,8 @@ local Search = require("lib/item_search")
 local M = {}
 
 local function integer(value, minimum)
-    if type(value) ~= "string" or not value:match("^%s*%d+%s*$") then return nil end
-    local number = tonumber(value)
+    if type(value) ~= "string" or not value:match("^%s*%d+%s*$", 1) then return nil end
+    local number = tonumber(value, 10)
     if number and number >= minimum and number <= 2147483647 then return number end
 end
 
@@ -17,7 +17,7 @@ function M.new(api)
             local cfg = api.lookup(itemID)
             if not cfg or cfg.id ~= itemID or type(cfg.name) ~= "string" then return nil end
             local configName = cfg.configName
-            if type(configName) ~= "string" or not configName:match("^[%a_][%w_]*$") then return nil end
+            if type(configName) ~= "string" or not configName:match("^[%a_][%w_]*$", 1) then return nil end
             return {id=itemID, name=cfg.name, configName=configName}
         end)
         if ok then return item end

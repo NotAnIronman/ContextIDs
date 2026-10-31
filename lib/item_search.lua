@@ -1,7 +1,7 @@
 local M = {}
 
 local function normalise(value)
-    return value:lower():gsub("[^%w]+", " "):match("^%s*(.-)%s*$")
+    return value:lower():gsub("[^%w]+", " ", math.maxinteger):match("^%s*(.-)%s*$", 1)
 end
 
 function M.new(load)
@@ -15,7 +15,7 @@ function M.new(load)
         if query == "" then return end
         if not data then data = load() end
         self.total = #data / 2
-        for word in query:gmatch("%S+") do words[#words+1] = word end
+        for word in query:gmatch("%S+", 1) do words[#words+1] = word end
         self.busy = true
     end
 
