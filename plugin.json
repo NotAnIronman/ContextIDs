@@ -1,0 +1,12 @@
+{
+  "name": "Context IDs",
+  "version": "0.3.1",
+  "contactEmailAddress": "TheMonthOfAugustus@gmail.com",
+  "requiredDependencies": {},
+  "optionalDependencies": {},
+  "requiredPermissions": [],
+  "optionalPermissions": [],
+  "urls": {},
+  "hasSettingsIcon": true,
+  "hasRibbonIcon": true
+}
